@@ -171,7 +171,7 @@
     }
     intersectionObserverHandler(entries) {
       entries.forEach(entry => {
-        if (entry.isIntersecting) {
+        if (entry.isIntersecting && this._model) {
           const panels = this.getPanels();
           const reviewContainer = this.getContainer();
           const children = this.renderReviewFields(panels);
@@ -202,7 +202,7 @@
     setValue(cloneNode, item) {
       const value = cloneNode.querySelector('[' + Review.templateAttribute + '-value]');
       if (value) {
-        value.innerHTML = this.getValue(item, item.value);
+        value.innerHTML = this.getValue(item, item.value) || '';
       }
     }
     renderReviewFields(items) {
