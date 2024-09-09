@@ -34,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @ExtendWith({ AemContextExtension.class, MockitoExtension.class })
 public class ReviewDataSourceServletTest {
 
-
     public static final String RT_FD_FORM_REVIEW_DATASOURCE_V1 = "core/fd/components/form/review/v1/datasource";
     private static final String TEST_BASE = "/form/review/datasource";
     private static final String APPS_ROOT = "/apps";
@@ -64,6 +63,5 @@ public class ReviewDataSourceServletTest {
         assertEquals("panelcontainer-ef1afcac03", resource.getValueMap().get("value", String.class));
 
     }
-
 
 }

@@ -52,9 +52,9 @@
 
     constructor(params) {
       super(params);
-      this.#attacheIntersectionObserver();
-      this.#attacheClickEvent();
-      this.setTemplateMapping();
+      this.#attachIntersectionObserver();
+      this.#attachClickEventOnEdit();
+      this.setFieldTemplateMapping();
     }
     getContainer() {
       return this.element.querySelector(Review.selectors.container);
@@ -75,23 +75,34 @@
       super.setModel(model);
     }
 
-    #attacheClickEvent() {
+    // attach click event on edit button to set focus on the field
+    #attachClickEventOnEdit() {
       this.getContainer().addEventListener('click', this.#clickHandler.bind(this))
     }
-    #attacheIntersectionObserver() {
+
+    // attach intersection observer to the review container for lazy loading
+    #attachIntersectionObserver() {
       let observer = new IntersectionObserver(this.intersectionObserverHandler.bind(this), Review.intersectionOptions);
       const ele = this.getIntersectionElement();
       if(ele){
         observer.observe(ele);
       }
     }
+
+    // click handler to set focus on the field when use click on edit button
     #clickHandler(event) {
       if (event?.target?.nodeName === 'BUTTON') {
         const id = event.target.getAttribute(Review.templateAttribute + '-fieldId');
-        this.formContainer.setFocus(id);
+        const form = this.formContainer.getModel();;
+        const field = this.formContainer.getField(id);
+        if (form && field) {
+          form.setFocus(field._model);
+        }
       }
     }
-    setTemplateMapping() {
+
+    // create template mapping based on field type and use it to render review fields
+    setFieldTemplateMapping() {
       const templates = this.getTemplates();
       let mappings = {};
       templates.forEach(template => {
@@ -100,6 +111,7 @@
       });
       this.templateMappings = mappings;
     }
+
     hasChild(panel) {
       return panel && panel.children && panel.children.length;
     }
@@ -114,8 +126,12 @@
       }
       return false;
     }
+
+    /* return value of the field, if value is array then return comma separated string and 
+    if value is file then return file name
+    */
     getValue(item, value) {
-      if (!value) return '';
+      if (value === undefined || value === null) return '';
       if (item.fieldType === 'file-input') {
         return Array.isArray(value) ? value.filter(file => file && file.name).map(file => file.name).join(',') : (value.name || '');
       }
@@ -134,6 +150,8 @@
       }
       return value;
     }
+
+    // return all top lavel panels if author has not linked any panel
     getAllPanels() {
       let state = this.formContainer._model.getState();
       while (state?.items?.length === 1) {
@@ -141,6 +159,8 @@
       }
       return state.items || [];
     }
+
+    // return linked panels if author has linked any panel
     getLinkedPanels() {
       let queue = [], result = [];
       let linkedPanels = [...(this._model?._jsonModel?.properties?.linkedPanels || [])];
@@ -162,6 +182,7 @@
       }
       return result;
     }
+
     getPanels() {
       let linkedPanels = this._model?._jsonModel?.properties?.linkedPanels || [];
       if (linkedPanels.length) {
@@ -169,25 +190,18 @@
       }
       return this.getAllPanels();
     }
-    intersectionObserverHandler(entries) {
-      entries.forEach(entry => {
-        if (entry.isIntersecting && this._model) {
-          const panels = this.getPanels();
-          const reviewContainer = this.getContainer();
-          const children = this.renderReviewFields(panels);
-          reviewContainer.innerHTML = '';
-          reviewContainer.appendChild(children);
-        }
-      })
-    }
-    setLabel(cloneNode, item) {
+
+    // render label of the field
+    renderLabel(cloneNode, item) {
       const label = cloneNode.querySelector('[' + Review.templateAttribute + '-label]');
       label.innerHTML = item.fieldType === 'plain-text' ? item.value : item?.label?.value;
       if (item.required) {
         label.setAttribute('data-cmp-required', item.required);
       }
     }
-    setEditButton(cloneNode, item) {
+
+    // render edit button of the field
+    renderEditButton(cloneNode, item) {
       let editAction = this._model?._jsonModel?.properties?.editAction;
       const editButton = cloneNode.querySelector('[' + Review.templateAttribute + '-editButton]');
       if (editButton) {
@@ -199,12 +213,16 @@
         editButton.setAttribute(Review.DATA_ATTRIBUTE_VISIBLE, this.showEditButton(item.fieldType, editAction));
       }
     }
-    setValue(cloneNode, item) {
+    renderValue(cloneNode, item) {
       const value = cloneNode.querySelector('[' + Review.templateAttribute + '-value]');
       if (value) {
-        value.innerHTML = this.getValue(item, item.value) || '';
+        const plainText = this.getValue(item, item.value) || '';
+        const sanitizedText = window.DOMPurify ?  window.DOMPurify.sanitize(plainText) : plainText;
+        value.innerHTML = sanitizedText;
       }
     }
+
+    // iterate over all the panels or linked panels and render child of each panel
     renderReviewFields(items) {
       if (!items) return;
       const currentFragment = document.createDocumentFragment();
@@ -217,8 +235,8 @@
         } else {
           let template = this.templateMappings[item.fieldType] || this.templateMappings['default'];
           const cloneNode = template.content.cloneNode(true);
-          this.setLabel(cloneNode, item);
-          this.setEditButton(cloneNode, item);
+          this.renderLabel(cloneNode, item);
+          this.renderEditButton(cloneNode, item);
           if (item.fieldType === 'panel') {
             const fields = this.renderReviewFields(item.items);
             if (this.hasChild(fields)) {
@@ -228,12 +246,25 @@
               currentFragment.appendChild(fields);
             }
           } else if (item.fieldType !== 'button' && !item[':type'].endsWith('review')) {
-            this.setValue(cloneNode, item);
+            this.renderValue(cloneNode, item);
             currentFragment.appendChild(cloneNode);
           }
         }
       });
       return currentFragment;
+    }
+
+    // if review container is in view port then render review fields
+    intersectionObserverHandler(entries) {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && this._model) {
+          const panels = this.getPanels();
+          const reviewContainer = this.getContainer();
+          const children = this.renderReviewFields(panels);
+          reviewContainer.innerHTML = '';
+          reviewContainer.appendChild(children);
+        }
+      })
     }
   }
 
