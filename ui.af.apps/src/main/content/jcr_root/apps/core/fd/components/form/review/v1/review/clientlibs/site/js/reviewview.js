@@ -101,6 +101,13 @@
       }
     }
 
+    sanitizedValue(value, options) {
+      if(options){
+        return window.DOMPurify ?  window.DOMPurify.sanitize(value, options) : value;
+      }
+      return window.DOMPurify ?  window.DOMPurify.sanitize(value) : value;
+    }
+
     // create template mapping based on field type and use it to render review fields
     setFieldTemplateMapping() {
       const templates = this.getTemplates();
@@ -125,6 +132,18 @@
         return true;
       }
       return false;
+    }
+
+    addClass(cloneNode, item) {
+      if(item.fieldType !== 'panel'){
+        cloneNode.querySelector('div').classList.add(Review.bemBlock + `__field--${item.fieldType}`);
+      }
+      if(item.repeatable){
+        cloneNode.querySelector('div').classList.add(Review.bemBlock + `__panel--repeatable`);
+      }
+      if(item.name){
+        cloneNode.querySelector('div').classList.add(item.name);
+      }
     }
 
     /* return value of the field, if value is array then return comma separated string and 
@@ -194,9 +213,17 @@
     // render label of the field
     renderLabel(cloneNode, item) {
       const label = cloneNode.querySelector('[' + Review.templateAttribute + '-label]');
-      label.innerHTML = item.fieldType === 'plain-text' ? item.value : item?.label?.value;
+      label.innerHTML = item.fieldType === 'plain-text' ? this.sanitizedValue(item.value) : this.sanitizedValue(item?.label?.value, {ALLOWED_TAGS: [] });
       if (item.required) {
         label.setAttribute('data-cmp-required', item.required);
+      }
+    }
+
+    renderValue(cloneNode, item) {
+      const value = cloneNode.querySelector('[' + Review.templateAttribute + '-value]');
+      if (value) {
+        const plainText = this.getValue(item, item.value) || '';
+        value.innerHTML = this.sanitizedValue(plainText);
       }
     }
 
@@ -213,14 +240,57 @@
         editButton.setAttribute(Review.DATA_ATTRIBUTE_VISIBLE, this.showEditButton(item.fieldType, editAction));
       }
     }
-    renderValue(cloneNode, item) {
+
+    addAccessibilityAttributes(cloneNode, item) {
+      const container = cloneNode.querySelector('[' + Review.templateAttribute + '-container]');
+      const label = cloneNode.querySelector('[' + Review.templateAttribute + '-label]');
       const value = cloneNode.querySelector('[' + Review.templateAttribute + '-value]');
-      if (value) {
-        const plainText = this.getValue(item, item.value) || '';
-        const sanitizedText = window.DOMPurify ?  window.DOMPurify.sanitize(plainText) : plainText;
-        value.innerHTML = sanitizedText;
+      const editButton = cloneNode.querySelector('[' + Review.templateAttribute + '-editButton]');
+      const id = `${item.id}-review-label`;
+      if(label){
+        label.setAttribute('id', id);
+        container.setAttribute('role', 'region');  
+        container.setAttribute('aria-labelledby', id);
+      }
+      if(value){
+        value.setAttribute('aria-labelledby', id);
+      }
+      if(editButton && editButton.getAttribute(Review.DATA_ATTRIBUTE_VISIBLE) === 'true'){
+        editButton.setAttribute('aria-describedby', id);
       }
     }
+
+    // renderReviewFields(items) {
+    //   if (!items) return;
+    //   const currentFragment = document.createDocumentFragment();
+    //   items.filter(item => item.visible !== false && item.fieldType && item[':type']).forEach(item => {
+    //     if (this.isRepeatable(item)) {
+    //       const repeatablePanel = this.renderReviewFields(item.items);
+    //       if (this.hasChild(repeatablePanel)) {
+    //         currentFragment.appendChild(repeatablePanel);
+    //       }
+    //     } else {
+    //       let template = this.templateMappings[item.fieldType] || this.templateMappings['default'];
+    //       const cloneNode = template.content.cloneNode(true);
+    //       this.addClass(cloneNode, item);
+    //       this.renderLabel(cloneNode, item);
+    //       this.renderEditButton(cloneNode, item);
+    //       if (item.fieldType === 'panel') {
+    //         const fields = this.renderReviewFields(item.items);
+    //         if (this.hasChild(fields)) {
+    //           if(item?.label?.visible !== false){
+    //             currentFragment.appendChild(cloneNode);
+    //           }
+    //           currentFragment.appendChild(fields);
+    //         }
+    //       } else if (item.fieldType !== 'button' && !item[':type'].endsWith('review')) {
+    //         this.renderValue(cloneNode, item);
+    //         currentFragment.appendChild(cloneNode);
+    //       }
+    //     }
+    //   });
+    //   return currentFragment;
+    // }
 
     // iterate over all the panels or linked panels and render child of each panel
     renderReviewFields(items) {
@@ -235,18 +305,26 @@
         } else {
           let template = this.templateMappings[item.fieldType] || this.templateMappings['default'];
           const cloneNode = template.content.cloneNode(true);
+          this.addClass(cloneNode, item);
           this.renderLabel(cloneNode, item);
           this.renderEditButton(cloneNode, item);
           if (item.fieldType === 'panel') {
             const fields = this.renderReviewFields(item.items);
             if (this.hasChild(fields)) {
-              if(item?.label?.visible !== false){
-                currentFragment.appendChild(cloneNode);
+              const labelContainer = cloneNode.querySelector(`.${Review.bemBlock}__label-container`);
+              if(item?.label?.visible === false && labelContainer){
+                labelContainer.remove();
               }
-              currentFragment.appendChild(fields);
+              this.addAccessibilityAttributes(cloneNode, item);
+              const contentElement = cloneNode.querySelector('[' + Review.templateAttribute + '-content]');
+              if(contentElement){
+                contentElement.appendChild(fields);
+              }
+              currentFragment.appendChild(cloneNode);
             }
-          } else if (item.fieldType !== 'button' && !item[':type'].endsWith('review')) {
+          } else if (item.fieldType !== 'button' && item.fieldType !== 'plain-text' && !item[':type'].endsWith('review')) {
             this.renderValue(cloneNode, item);
+            this.addAccessibilityAttributes(cloneNode, item);
             currentFragment.appendChild(cloneNode);
           }
         }

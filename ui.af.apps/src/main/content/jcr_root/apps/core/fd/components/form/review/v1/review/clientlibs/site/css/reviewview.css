@@ -23,12 +23,14 @@
     color: #000;
  }
  .cmp-adaptiveform-review__panel{
-  margin-top: 44px;
-   display: flex;
- }
- .cmp-adaptiveform-review__panel:first-of-type{
   margin-top: 12px;
  }
+ .cmp-adaptiveform-review__label-container{
+  display: flex;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.40);
+  padding-bottom: 10px;
+ }
+ 
  .cmp-adaptiveform-review__field{
    display: flex;
    margin: 12px 0;
