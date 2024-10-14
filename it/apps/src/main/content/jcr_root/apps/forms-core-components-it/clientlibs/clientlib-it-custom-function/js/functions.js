@@ -238,3 +238,56 @@ function customMessageUsingInvalidApi(field, globals) {
         globals.functions.setProperty(field, {valid : true});
     }
 }
+
+let label = '',
+    panelLabel = '';
+
+/**
+ * updatePanelLabel
+ * @name updatePanelLabel
+ * @param {object} repeatablePanel
+ * @param {scope} globals
+ */
+function updatePanelLabel(repeatablePanel, globals) {
+
+    if (globals.field.$fieldType === 'panel' && label === '') {
+        label = globals.field.who_lives_name.$label.value;
+        panelLabel = globals.field.$label.value;
+        globals.functions.setProperty(globals.field, {label: {"value": panelLabel + (globals.field.$index + 1)}});
+        globals.functions.setProperty(globals.field.who_lives_name, {label: {"value": label + "<b>" + (globals.field.$index + 1) + "</b>"}});
+    }
+
+    // walk through other instances and update their label
+    repeatablePanel.$parent.forEach(panel => {
+        globals.functions.setProperty(panel,{label : {"value" : panelLabel + (panel.$index+1)}});
+        globals.functions.setProperty(panel.who_lives_name,{label : {"value" : label+"<b>"+(panel.$index+1)+"</b>"}});
+    });
+}
+
+
+
+/**
+ * Tests add instance with dispatchEvent
+ * @name addPanelInstance
+ * @param {object} panel
+ * @param {scope} globals
+ */
+function addPanelInstance(panel,globals)
+{
+    globals.functions.dispatchEvent(panel,'addInstance', globals.field.$parent.$index + 1);
+}
+
+
+/**
+ * Tests remove instance with dispatchEvent
+ * @name removePanelInstance
+ * @param {object} panel
+ * @param {scope} globals
+ */
+function removePanelInstance(panel,globals)
+{
+    globals.functions.dispatchEvent(panel, 'removeInstance', globals.field.$parent.$index);
+    panel.forEach(p => {
+        globals.functions.dispatchEvent(p, 'initialize');
+    })
+}
